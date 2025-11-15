@@ -280,6 +280,7 @@ export async function reboot(): Promise<boolean> {
 }
 
 export async function commitOsPartition(umbreld: Umbreld): Promise<boolean> {
+	// Docker container - no OS partition to commit
 	return true
 }
 

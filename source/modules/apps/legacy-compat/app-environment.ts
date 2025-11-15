@@ -2,17 +2,20 @@ import {fileURLToPath} from 'node:url'
 import {dirname, join} from 'node:path'
 
 import {$} from 'execa'
-import fse from 'fs-extra'
 
 import type Umbreld from '../../../index.js'
 
 export default async function appEnvironment(umbreld: Umbreld, command: string) {
+	let inheritStdio = true
+	// Prevent breaking test output
+	if (process.env.TEST === 'true') inheritStdio = false
+
 	const currentFilename = fileURLToPath(import.meta.url)
 	const currentDirname = dirname(currentFilename)
 	const composePath = join(currentDirname, 'docker-compose.yml')
 	const torEnabled = await umbreld.store.get('torEnabled')
 	const options = {
-		stdio: 'inherit',
+		stdio: inheritStdio ? 'inherit' : 'pipe',
 		cwd: umbreld.dataDirectory,
 		env: {
 			UMBREL_DATA_DIR: umbreld.dataDirectory,
@@ -31,16 +34,14 @@ export default async function appEnvironment(umbreld: Umbreld, command: string) 
 			JWT_SECRET: await umbreld.server.getJwtSecret(),
 			UMBRELD_RPC_HOST: `host.docker.internal:${umbreld.server.port}`, // TODO: Check host.docker.internal works on linux
 			UMBREL_LEGACY_COMPAT_DIR: currentDirname,
-			UMBREL_TORRC: torEnabled ? `${umbreld.dataDirectory}/tor/tor-server-torrc` : `${umbreld.dataDirectory}/tor/tor-proxy-torrc`,
+			UMBREL_TORRC: torEnabled ? `${currentDirname}/tor-server-torrc` : `${currentDirname}/tor-proxy-torrc`,
 		},
 	}
 	if (command === 'up') {
-                await fse.copy(`${currentDirname}/tor-proxy-torrc`, `${umbreld.dataDirectory}/tor/tor-proxy-torrc`)
-                await fse.copy(`${currentDirname}/tor-server-torrc`, `${umbreld.dataDirectory}/tor/tor-server-torrc`)
 		await $(
 			options as any,
-		)`docker compose --project-name umbrelc --file ${composePath} ${command} --build --detach --remove-orphans`
+		)`docker compose --project-name umbrel --file ${composePath} ${command} --build --detach --remove-orphans`
 	} else {
-		await $(options as any)`docker compose --project-name umbrelc --file ${composePath} ${command}`
+		await $(options as any)`docker compose --project-name umbrel --file ${composePath} ${command}`
 	}
 }

@@ -1,3 +1,5 @@
+version: '3.7'
+
 services:
   tor_proxy:
     container_name: tor_proxy
@@ -10,7 +12,7 @@ services:
     environment:
       HOME: '/tmp'
     networks:
-      umbrel_main_network:
+      default:
         ipv4_address: $TOR_PROXY_IP
   auth:
     container_name: auth
@@ -38,9 +40,12 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     networks:
-      umbrel_main_network:
+      default:
         ipv4_address: $AUTH_IP
-
 networks:
-  umbrel_main_network:
-    external: true
+  default:
+    name: umbrel_main_network
+    ipam:
+      driver: default
+      config:
+        - subnet: '$NETWORK_IP/16'
