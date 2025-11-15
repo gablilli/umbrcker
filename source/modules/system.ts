@@ -47,20 +47,34 @@ export async function getSystemDiskUsage(umbreld: Umbreld): Promise<{size: numbe
 		throw new Error('umbreldDataDir must be a non-empty string')
 	}
 
-	// to calculate the disk usage of each app
-	const fileSystemSize = await systemInformation.fsSize()
-
 	// Get the disk usage information for the file system containing the Umbreld data dir.
-	// Sort by mount length to get the most specific mount point
-	const df = await $`df -h ${umbreld.dataDirectory}`
-	const partition = df.stdout.split('\n').slice(-1)[0].split(' ')[0]
-	const dataDirectoryFilesystem = fileSystemSize.find((filesystem) => filesystem.fs === partition)
-
-	if (!dataDirectoryFilesystem) {
-		throw new Error('Could not find file system containing Umbreld data directory')
+	// Use -B1 to get output in bytes for accurate parsing
+	const df = await $`df -B1 ${umbreld.dataDirectory}`
+	
+	// Parse the df output
+	// Output format: Filesystem 1B-blocks Used Available Use% Mounted
+	const lines = df.stdout.trim().split('\n')
+	if (lines.length < 2) {
+		throw new Error('Could not parse df output for Umbreld data directory')
 	}
-
-	const {size, used} = dataDirectoryFilesystem
+	
+	// Get the last line (the actual data, not the header)
+	const dataLine = lines[lines.length - 1]
+	// Split by whitespace and filter out empty strings
+	const columns = dataLine.split(/\s+/).filter(col => col.length > 0)
+	
+	// Columns are: Filesystem, 1B-blocks, Used, Available, Use%, Mounted
+	// We need index 1 (total size) and index 2 (used)
+	if (columns.length < 3) {
+		throw new Error('Could not parse filesystem size from df output')
+	}
+	
+	const size = parseInt(columns[1], 10)
+	const used = parseInt(columns[2], 10)
+	
+	if (isNaN(size) || isNaN(used)) {
+		throw new Error('Could not parse filesystem size values')
+	}
 
 	return {
 		size,
