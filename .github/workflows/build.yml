@@ -57,13 +57,25 @@ jobs:
           images: |
             ${{ secrets.DOCKERHUB_REPO }}
             ghcr.io/${{ github.repository }}
+          # Rimuovo la generazione automatica di 'latest' per evitare che BuildKit cerchi quel ref come cache remota
           tags: |
-            type=raw,value=latest,priority=100,enable=${{ env.beta == 'false' }}
             type=raw,value=${{ vars.VERSION }}
           labels: |
             org.opencontainers.image.title=${{ vars.NAME }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index     
+
+      # Calcolo un tag garantito: se metadata produce version la uso, altrimenti uso il numero della run
+      -
+        name: Set image tag (use version if available, otherwise run number)
+        if: env.exists == 'false'
+        id: set_tag
+        run: |
+          if [ -n "${{ steps.meta.outputs.version }}" ]; then
+            echo "image_tag=${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "image_tag=${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+          fi
       - 
         name: Set up Docker Buildx
         if: env.exists == 'false'
@@ -84,7 +96,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       -
-        name: Build Docker image
+        name: Build Docker image and push version tags
         if: env.exists == 'false'
         uses: docker/build-push-action@v6
         with:
@@ -92,23 +104,23 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
+          # Usiamo il tag calcolato come tag principale per il push (e includiamo anche gli eventuali tag prodotti dal metadata)
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ secrets.DOCKERHUB_REPO }}:${{ steps.set_tag.outputs.image_tag }}
+            ghcr.io/${{ github.repository }}:${{ steps.set_tag.outputs.image_tag }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           build-args: |
             VERSION_ARG=${{ steps.meta.outputs.version }}
       -
-        name: Push gabriiii/umbrcker:latest
+        name: Tag and push gabriiii/umbrcker:latest to Docker Hub
         if: env.exists == 'false'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          provenance: false
-          platforms: linux/amd64,linux/arm64
-          tags: gabriiii/umbrcker:latest
-          build-args: |
-            VERSION_ARG=${{ steps.meta.outputs.version }}
+        run: |
+          # Tag the just-pushed versioned image as latest and push it
+          docker pull ${{ secrets.DOCKERHUB_REPO }}:${{ steps.set_tag.outputs.image_tag }}
+          docker tag ${{ secrets.DOCKERHUB_REPO }}:${{ steps.set_tag.outputs.image_tag }} gabriiii/umbrcker:latest
+          docker push gabriiii/umbrcker:latest
       -
         name: Create a release
         if: env.exists == 'false'
