@@ -58,11 +58,25 @@ jobs:
             ${{ secrets.DOCKERHUB_REPO }}
             ghcr.io/${{ github.repository }}
           tags: |
+            type=raw,value=latest,priority=100,enable=${{ env.beta == 'false' }}
             type=raw,value=${{ vars.VERSION }}
           labels: |
             org.opencontainers.image.title=${{ vars.NAME }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index     
+
+      # Nuovo step minimale: calcolo del tag di fallback se steps.meta.outputs.version è vuoto
+      -
+        name: Set image tag (use version if available, otherwise run number)
+        if: env.exists == 'false'
+        id: set_tag
+        run: |
+          # Se docker/metadata-action ha prodotto una versione, la usiamo; altrimenti fallback al numero della run
+          if [ -n "${{ steps.meta.outputs.version }}" ]; then
+            echo "image_tag=${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "image_tag=${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+          fi
       - 
         name: Set up Docker Buildx
         if: env.exists == 'false'
@@ -91,7 +105,11 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
+          # tags: usa i tag prodotti da docker/metadata-action + un fallback garantito (image_tag)
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ secrets.DOCKERHUB_REPO }}:${{ steps.set_tag.outputs.image_tag }}
+            ghcr.io/${{ github.repository }}:${{ steps.set_tag.outputs.image_tag }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           build-args: |
