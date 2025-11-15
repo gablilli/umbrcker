@@ -57,25 +57,13 @@ jobs:
           images: |
             ${{ secrets.DOCKERHUB_REPO }}
             ghcr.io/${{ github.repository }}
-          # Rimosso il tag 'latest' per evitare che buildx cerchi un ref 'latest' che non esiste
           tags: |
+            type=raw,value=latest,priority=100,enable=${{ env.beta == 'false' }}
             type=raw,value=${{ vars.VERSION }}
           labels: |
             org.opencontainers.image.title=${{ vars.NAME }}
         env:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index     
-
-      # Step minimo per garantire sempre almeno un tag, anche se non ci sono tag Git
-      -
-        name: Set image tag (use version if available, otherwise run number)
-        if: env.exists == 'false'
-        id: set_tag
-        run: |
-          if [ -n "${{ steps.meta.outputs.version }}" ]; then
-            echo "image_tag=${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "image_tag=${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
-          fi
       - 
         name: Set up Docker Buildx
         if: env.exists == 'false'
@@ -104,13 +92,21 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          # tag principali (quelli prodotti da metadata) + fallback garantito
-          tags: |
-            ${{ steps.meta.outputs.tags }}
-            ${{ secrets.DOCKERHUB_REPO }}:${{ steps.set_tag.outputs.image_tag }}
-            ghcr.io/${{ github.repository }}:${{ steps.set_tag.outputs.image_tag }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+          build-args: |
+            VERSION_ARG=${{ steps.meta.outputs.version }}
+      -
+        name: Push gabriiii/umbrcker:latest
+        if: env.exists == 'false'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          provenance: false
+          platforms: linux/amd64,linux/arm64
+          tags: gabriiii/umbrcker:latest
           build-args: |
             VERSION_ARG=${{ steps.meta.outputs.version }}
       -
