@@ -58,7 +58,6 @@ jobs:
             ${{ secrets.DOCKERHUB_REPO }}
             ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,priority=100,enable=${{ env.beta == 'false' }}
             type=raw,value=${{ vars.VERSION }}
           labels: |
             org.opencontainers.image.title=${{ vars.NAME }}
