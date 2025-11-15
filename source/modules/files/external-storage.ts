@@ -1,122 +1,51 @@
-import nodePath from 'node:path'
-
-import {$} from 'execa'
-import fse from 'fs-extra'
-import PQueue from 'p-queue'
-
 import type Umbreld from '../../index.js'
-import isUmbrelHome from '../is-umbrel-home.js'
 
-type LsblkDevice = {
-	name: string
-	kname: string
-	label?: string | null
-	type?: string
-	mountpoints?: string[] | null
-	tran?: string | null
-	model?: string | null
-	size?: number | null
-	children?: LsblkDevice[]
-	parttypename?: string
-	serial?: string
-}
-
-type Disk = {
-	id: string
-	label: string
-	size: number
-}
-
-type Partition = {
-	id: string
-	diskId: string
-	mountpoints: string[]
-	label: string
-	size: number
-}
-
-type Mount = {
-	diskId: string
-	partitionId: string
-	mountpoint: string
-	label: string
-	size: number
-}
-
-const mountQueue = new PQueue({concurrency: 1})
-
-async function isSupported() {
-	return false
-}
-
-class ExternalStorage {
+// External storage is disabled in Docker containers
+export default class ExternalStorage {
 	#umbreld: Umbreld
 	logger: Umbreld['logger']
-	disks: Map<string, Disk> = new Map()
-	mounts: Map<string, Mount> = new Map()
-	running = false
+	formatJobs: Set<string> = new Set()
 
 	constructor(umbreld: Umbreld) {
 		this.#umbreld = umbreld
 		const {name} = this.constructor
-		this.logger = umbreld.logger.createChildLogger(name.toLocaleLowerCase())
+		this.logger = umbreld.logger.createChildLogger(`files:${name.toLocaleLowerCase()}`)
+	}
+
+	// Disabled in Docker container
+	async supported() {
+		return false
 	}
 
 	async start() {
+		// External storage is disabled in Docker container
 		return
 	}
 
 	async stop() {
+		// External storage is disabled in Docker container
 		return
 	}
 
-	get() {
-		return null
-	}
-
-	async updateMounts() {
-    this.logger.error(`Failed to update mounts`)
+	async unmountExternalDevice(deviceId: string, {remove = true} = {}) {
+		this.logger.error(`External storage is not supported in Docker container`)
 		return false
 	}
 
-	async eject(diskId: string) {
-		this.logger.error(`Failed to eject disk '${disk.id}'`)
-		return false
+	async formatExternalDevice(args: any) {
+		this.logger.error(`External storage is not supported in Docker container`)
+		throw new Error('External storage is not supported in Docker container')
 	}
 
-	#onUdisksChange = () => {
-		this.updateMounts().catch((error) => this.logger.error(`Failed to update mounts: ${error.message}`))
+	async getExternalDevicesWithVirtualMountPoints() {
+		return []
 	}
 
-	async isExternalDriveConnectedOnNonUmbrelHome() {
-		
+	async getMountedExternalDevices() {
+		return []
+	}
+
+	async isExternalDeviceConnectedOnUnsupportedDevice() {
 		return false
-
-  }
-}
-
-export default ExternalStorage
-
-async function getDisksAndPartitions() {
-
-	const disks: Disk[] = []
-	const partitions: Partition[] = []
-
-	return {disks, partitions}
-}
-
-async function mountExists(mountpoint: string) {
-	return false
-}
-
-async function mountPartition(id: string, mountpoint: string) {
-	return false
-}
-
-async function unmountPartition(mountpoint: string) {
-	return false
-}
-
-async function discardDisk(diskId: string) {
-	return false
+	}
 }
