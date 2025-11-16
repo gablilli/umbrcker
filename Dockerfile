@@ -32,6 +32,7 @@ RUN rm -rf node_modules || true
 RUN pnpm install
 
 # Build the app
+COPY umbreld/ /app/umbreld/
 RUN pnpm run build
 
 #########################################################################
