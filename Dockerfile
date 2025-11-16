@@ -7,7 +7,8 @@ ARG DEBIAN_VERSION=bookworm
 FROM --platform=$BUILDPLATFORM scratch AS base
 
 ARG VERSION_ARG="1.5.0"
-ADD https://github.com/getumbrel/umbrel.git#refs/tags/${VERSION_ARG} /
+RUN git clone --branch $VERSION_ARG --depth 1 https://github.com/getumbrel/umbrel.git / \
+    || (echo "Ref $VERSION_ARG not found" && exit 1)
 
 # Apply custom patches
 COPY source /packages/umbreld/source
